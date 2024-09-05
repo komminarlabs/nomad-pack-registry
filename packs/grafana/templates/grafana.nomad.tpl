@@ -1,4 +1,4 @@
-job "influxdb2" {
+job "grafana" {
   region      = "[[ var "region" . ]]"
   datacenters = [[ (var "datacenters" .) | toStringList ]]
   node_pool   = "[[ var "node_pool" . ]]"
@@ -8,7 +8,7 @@ job "influxdb2" {
   [[- end ]]
 
   [[- if var "constraints" . ]][[ range $idx, $constraint := var "constraints" . ]]
-
+  
   constraint {
     [[- if ne $constraint.attribute "" ]]
     attribute = "[[ $constraint.attribute ]]"
@@ -23,12 +23,12 @@ job "influxdb2" {
   [[- end ]]
   [[- end ]]
 
-  group "influxdb2" {
+  group "grafana" {
     count = 1
 
     network {
       port "http" {
-        static = 8086
+        static = 3000
       }
     }
 
@@ -51,17 +51,15 @@ job "influxdb2" {
     }
     [[- end ]]
 
-    [[- if var "config_volume.name" . ]]
+    [[- if var "vault_policies" . ]]
 
-    volume "[[ var "config_volume.name" . ]]" {
-      type      = "[[ var "config_volume.type" . ]]"
-      read_only = false
-      source    = "[[ var "config_volume.name" . ]]"
+    vault {
+      policies    = [[ (var "vault_policies" .) | toStringList ]]
+      change_mode = "noop"
     }
     [[- end ]]
 
-    [[- if var "data_volume.name" . ]]
-
+    [[- if var "data_volume" . ]]
     volume "[[ var "data_volume.name" . ]]" {
       type      = "[[ var "data_volume.type" . ]]"
       read_only = false
@@ -69,14 +67,7 @@ job "influxdb2" {
     }
     [[- end ]]
 
-    restart {
-      attempts = 2
-      interval = "30m"
-      delay    = "15s"
-      mode     = "fail"
-    }
-
-    [[- if var "data_volume.name" . ]]
+    [[- if var "data_volume" . ]]
 
     task "chown_data_volume" {
       driver = "docker"
@@ -88,14 +79,14 @@ job "influxdb2" {
 
       volume_mount {
         volume      = "[[ var "data_volume.name" . ]]"
-        destination = "/var/lib/influxdb2"
+        destination = "/var/lib/grafana"
         read_only   = false
       }
 
       config {
         image   = "busybox:stable"
         command = "sh"
-        args    = ["-c", "chown -R 1000:1000 /var/lib/influxdb2"]
+        args    = ["-c", "chown -R 1000:1000 /var/lib/grafana"]
       }
 
       resources {
@@ -105,65 +96,26 @@ job "influxdb2" {
     }
     [[- end ]]
 
-    [[- if var "config_volume.name" . ]]
-
-    task "chown_config_volume" {
-      driver = "docker"
-      user   = "root"
-
-      lifecycle {
-        hook    = "prestart"
-        sidecar = false
-      }
-
-      volume_mount {
-        volume      = "[[ var "config_volume.name" . ]]"
-        destination = "/etc/influxdb2"
-        read_only   = false
-      }
-      
-      config {
-        image   = "busybox:stable"
-        command = "sh"
-        args    = ["-c", "chown -R 1000:1000 /etc/influxdb2"]
-      }
-
-      resources {
-        cpu    = 200
-        memory = 128
-      }
-    }
-    [[- end ]]
-
-    task "influxdb2" {
+    task "grafana" {
       driver = "docker"
 
-      [[- if var "data_volume.name" . ]]
+      [[- if var "data_volume" . ]]
 
       volume_mount {
         volume      = "[[ var "data_volume.name" . ]]"
-        destination = "/var/lib/influxdb2"
-        read_only   = false
-      }
-      [[- end ]]
-
-      [[- if var "config_volume.name" . ]]
-
-      volume_mount {
-        volume      = "[[ var "config_volume.name" . ]]"
-        destination = "/etc/influxdb2"
+        destination = "/var/lib/grafana"
         read_only   = false
       }
       [[- end ]]
 
       config {
-        image = "influxdb:[[ var "influxdb2_version_tag" . ]]"
+        image = "grafana/grafana:[[ var "grafana_version_tag" . ]]"
         ports = ["http"]
       }
 
       resources {
-        cpu    = [[ var "task_resources.cpu" . ]]
-        memory = [[ var "task_resources.memory" . ]]
+        cpu    = [[ var "grafana_task_resources.cpu" . ]]
+        memory = [[ var "grafana_task_resources.memory" . ]]
       }
 
       [[- if ne (len (var "docker_env_vars" .)) 0 ]]
@@ -174,6 +126,59 @@ job "influxdb2" {
         [[- end ]]
       }
       [[- end ]]
+
+      [[- if var "grafana_task_artifacts" . ]]
+      [[- range $artifact := var "grafana_task_artifacts" . ]]
+
+      artifact {
+        source      = "[[ $artifact.source ]]"
+        destination = "[[ $artifact.destination ]]"
+        mode        = "[[ $artifact.mode ]]"
+        [[- if $artifact.options ]]
+        options {
+          [[- range $option, $val := $artifact.options ]]
+          [[ $option ]] = "[[ $val ]]"
+          [[- end ]]
+        }
+        [[- end ]]
+      }
+      [[- end ]]
+      [[- end ]]
+
+      template {
+        data        = <<EOF
+[[ var "grafana_task_config_ini" . ]]
+EOF
+        destination = "/local/grafana/grafana.ini"
+      }
+
+      [[- if var "grafana_task_config_dashboards" . ]]
+      template {
+        data        = <<EOF
+[[ var "grafana_task_config_dashboards" . ]]
+EOF
+        destination = "/local/grafana/provisioning/dashboards/dashboards.yaml"
+      }
+      [[ end ]]
+
+      [[- if var "grafana_task_config_datasources" . ]]
+      template {
+        data        = <<EOF
+[[ var "grafana_task_config_datasources" . ]]
+EOF
+        destination = "/local/grafana/provisioning/datasources/datasources.yaml"
+      }
+      [[ end ]]
+
+      [[- if var "grafana_task_config_plugins" . ]]
+
+      template {
+        data        = <<EOF
+[[ var "grafana_task_config_plugins" . ]]
+EOF
+        destination = "/local/grafana/provisioning/plugins/plugins.yml"
+      }
+      [[- end -]]
     }
   }
 }
