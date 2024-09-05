@@ -1,13 +1,19 @@
-config_volume_name      = "config_volume"
-data_volume_name        = "data_volume"
-register_consul_service = true
+data_volume = {
+  name = "influxdb2_data_volume"
+  type = "host"
+}
 
-docker_influxdb2_env_vars = {
-  "docker_influxdb_init_mode" : "setup",
-  "docker_influxdb_init_username" : "username",
-  "docker_influxdb_init_password" : "password",
-  "docker_influxdb_init_org" : "org",
-  "docker_influxdb_init_bucket" : "bucket",
-  "docker_influxdb_init_retention" : "1w",
-  "docker_influxdb_init_admin_token" : "supersecrettoken12345",
+config_volume = {
+  name = "influxdb2_config_volume"
+  type = "host"
+}
+
+docker_env_vars = {
+  "DOCKER_INFLUXDB_INIT_MODE" : "setup",
+  "DOCKER_INFLUXDB_INIT_USERNAME" : "username",
+  "DOCKER_INFLUXDB_INIT_PASSWORD" : "password",
+  "DOCKER_INFLUXDB_INIT_ORG" : "org",
+  "DOCKER_INFLUXDB_INIT_BUCKET" : "bucket",
+  "DOCKER_INFLUXDB_INIT_RETENTION" : "1w",
+  "DOCKER_INFLUXDB_INIT_ADMIN_TOKEN" : "supersecrettoken12345",
 }
