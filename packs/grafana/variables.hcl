@@ -15,7 +15,7 @@ variable "constraints" {
 }
 
 variable "consul_service" {
-  description = "The consul service for grafana."
+  description = "The consul service for Grafana."
   type = object({
     name     = string
     register = bool
@@ -29,7 +29,7 @@ variable "consul_service" {
 }
 
 variable "data_volume" {
-  description = "The dedicated data volume you want InfluxDB to use."
+  description = "The dedicated data volume you want Grafana to use."
   type = object({
     type   = string
     source = string

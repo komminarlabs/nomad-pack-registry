@@ -10,3 +10,4 @@ nomad-pack registry add default github.com/komminarlabs/nomad-pack-registry
 
 - [Grafana OSS](/packs/grafana/README.md)
 - [InfluxDB OSS](/packs/influxdb2/README.md)
+- [Node-RED](/packs/node-red/README.md)
